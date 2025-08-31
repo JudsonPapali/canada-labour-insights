@@ -1,0 +1,82 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canada Labour Insights</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-5xl mx-auto p-6">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold">Canada Labour Insights</h1>
+      <p class="text-sm text-slate-600">Taxa de desemprego (mensal, dessazonalizada) — últimos 24 meses</p>
+    </header>
+
+    <section class="bg-white rounded-2xl shadow p-4">
+      <div class="flex flex-col md:flex-row md:items-end gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium">Província/Território</label>
+          <select id="geo" class="mt-1 border rounded-xl px-3 py-2">
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium">Meses</label>
+          <input id="months" type="number" value="24" min="6" max="120" class="mt-1 border rounded-xl px-3 py-2 w-28" />
+        </div>
+        <button id="btn" class="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Atualizar</button>
+      </div>
+
+      <div class="relative" style="height: 420px;">
+        <canvas id="chart"></canvas>
+      </div>
+    </section>
+
+    <footer class="mt-8 text-xs text-slate-500">
+      <p>Fonte: Statistics Canada — tabela 14-10-0287-03 (Full Table CSV).</p>
+      <p>© 2025 — Canada Labour Insights</p>
+    </footer>
+  </div>
+
+  <script>
+    const geoSel = document.getElementById('geo');
+    const monthsInput = document.getElementById('months');
+    const btn = document.getElementById('btn');
+    const ctx = document.getElementById('chart').getContext('2d');
+    let chart;
+
+    async function loadRegions(){
+      const res = await fetch('/api/regions');
+      const data = await res.json();
+      geoSel.innerHTML = '';
+      data.regions.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r; opt.textContent = r; geoSel.appendChild(opt);
+      });
+      geoSel.value = 'Canada';
+    }
+
+    async function loadSeries(){
+      const geo = geoSel.value;
+      const latest_n = parseInt(monthsInput.value, 10) || 24;
+      const res = await fetch(`/api/unemployment?geo=${encodeURIComponent(geo)}&latest_n=${latest_n}`);
+      const data = await res.json();
+      const labels = data.series.map(d => d.date);
+      const values = data.series.map(d => d.value);
+
+      if(chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets: [{ label: `${data.geo} — Unemployment %`, data: values, tension: 0.2, fill: false }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { callback: v => v + '%' } } } }
+      });
+    }
+
+    btn.addEventListener('click', loadSeries);
+
+    (async () => { await loadRegions(); await loadSeries(); })();
+  </script>
+</body>
+</html>
